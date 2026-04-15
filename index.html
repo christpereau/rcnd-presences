@@ -150,7 +150,7 @@ select option{background:var(--hull)}
 </header>
 <div class="wrap">
 <div class="lbar" id="lb"></div>
-
+ 
 <div class="page active" id="page-pres">
 <div class="ptitle">Presences</div>
 <div class="card"><div class="clabel">Seance</div><div class="row">
@@ -181,7 +181,7 @@ select option{background:var(--hull)}
   <div class="bgrid" id="bgrid"><div class="empty"><div class="ico">...</div>Marquez des presences puis ajoutez des bateaux.</div></div>
 </div>
 </div>
-
+ 
 <div class="page" id="page-rameurs">
 <div class="ptitle">Rameurs</div>
 <div class="card"><div class="clabel">Importer CSV</div>
@@ -201,14 +201,14 @@ select option{background:var(--hull)}
 <div class="ctabs" id="rTabs"></div>
 <div id="rList"><div class="empty"><div class="ico">...</div>Chargement...</div></div>
 </div>
-
+ 
 <div class="page" id="page-stats">
 <div class="ptitle">Statistiques</div>
 <div class="kgrid" id="kgrid"><div class="empty" style="grid-column:1/-1"><div class="ico">...</div>Chargement...</div></div>
 <div class="card"><div class="clabel">Classement (cliquez pour details)</div><div id="rkList"></div></div>
 <div class="card" style="margin-top:9px"><div class="clabel">A surveiller moins de 60%</div><div id="alList"></div></div>
 </div>
-
+ 
 <div class="page" id="page-hist">
 <div class="ptitle">Historique</div>
 <div class="toolbar">
@@ -218,9 +218,9 @@ select option{background:var(--hull)}
 </div>
 <div id="hList"><div class="empty"><div class="ico">...</div>Chargement...</div></div>
 </div>
-
+ 
 </div>
-
+ 
 <div class="mspanel" id="msPanel" onclick="if(event.target===this)closeMs()">
   <div class="msbox">
     <div class="msttl" id="msTtl">Ajouter rameurs</div>
@@ -232,7 +232,7 @@ select option{background:var(--hull)}
     </div>
   </div>
 </div>
-
+ 
 <div class="mbg" id="mbg" onclick="if(event.target===this)this.classList.remove('open')">
   <div class="modal">
     <div class="mtitle" id="mtitle"></div>
@@ -241,13 +241,13 @@ select option{background:var(--hull)}
     <button class="btn boutline bsm" onclick="document.getElementById('mbg').classList.remove('open')">Fermer</button>
   </div>
 </div>
-
+ 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
-firebase.initializeApp({apiKey: "",  // clé gérée autrement,authDomain:"jeune-entrainement.firebaseapp.com",projectId:"jeune-entrainement",storageBucket:"jeune-entrainement.firebasestorage.app",messagingSenderId:"588281323716",appId:"1:588281323716:web:df6edb41921ea321082991"});
+firebase.initializeApp({apiKey:"AIzaSyBqrhteGQUfOz8YjIhcNwrzgIkChq7HlvE",authDomain:"jeune-entrainement.firebaseapp.com",projectId:"jeune-entrainement",storageBucket:"jeune-entrainement.firebasestorage.app",messagingSenderId:"588281323716",appId:"1:588281323716:web:df6edb41921ea321082991"});
 var db=firebase.firestore();
-
+ 
 var SEED=[
   {id:"r01",name:"Couvreur Justin",lic:"09.26.513",cat:"U19"},
   {id:"r02",name:"Dacosse Sasha",lic:"11.26.507",cat:"U17"},
@@ -272,10 +272,10 @@ var SEED=[
   {id:"r21",name:"Ricard Esteban",lic:"14.26.509",cat:"U13"},
   {id:"r22",name:"Ricard Helene",lic:"08.26.508",cat:"U19"}
 ];
-
+ 
 var rowers=[],sessions=[],att={},boats=[],catP="Tous",catR="Tous";
 var CATS=["U13","U15","U17","U19","U23"],MAXBOATS=20;
-
+ 
 function maxS(n){if(n==="4X"||n==="4-")return 4;if(n==="2X"||n==="2-")return 2;return 1;}
 function xe(s){return String(s||"").replace(/\x26/g,"&amp;").replace(/\x3c/g,"&lt;").replace(/\x3e/g,"&gt;");}
 function fd(d){var p=d.split("-");return p[2]+"/"+p[1]+"/"+p[0];}
@@ -294,7 +294,7 @@ function flash(m,t){
   e.textContent=m;e.style.color=(t==="ok")?"#2eb87a":"#e05c3a";e.style.opacity="1";
   clearTimeout(_ft);_ft=setTimeout(function(){e.style.opacity="0";},3000);
 }
-
+ 
 function showPage(n,b){
   document.querySelectorAll(".page").forEach(function(p){p.classList.remove("active");});
   document.querySelectorAll("nav button").forEach(function(x){x.classList.remove("active");});
@@ -314,20 +314,20 @@ function setCatP(c){catP=c;buildTabs();renderAtt();}
 function setCatR(c){catR=c;buildTabs();renderRowers();}
 function filt(cat){return cat==="Tous"?rowers:rowers.filter(function(r){return r.cat===cat;});}
 function defAbsent(){rowers.forEach(function(r){if(att[r.id]===undefined)att[r.id]=false;});}
-
+ 
 document.getElementById("sDate").value=today();
 ld(true);setSt("Connexion...");
-
+ 
 db.collection("rowers").onSnapshot(function(snap){
   rowers=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());}).sort(function(a,b){return a.name.localeCompare(b.name);});
   defAbsent();buildTabs();renderAtt();renderRowers();ld(false);setSt("");
 },function(err){setSt("Erreur: "+err.message);ld(false);});
-
+ 
 db.collection("sessions").orderBy("date","desc").onSnapshot(function(snap){
   sessions=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});
   renderHist();renderStats();
 },function(e){console.warn(e);});
-
+ 
 db.collection("rowers").get().then(function(snap){
   if(snap.empty){
     setSt("Import...");
@@ -336,7 +336,7 @@ db.collection("rowers").get().then(function(snap){
     return b.commit();
   }
 }).catch(function(e){console.warn(e);});
-
+ 
 function addRower(){
   var name=document.getElementById("nNom").value.trim();
   if(!name)return flash("Entrez un nom.");
@@ -385,13 +385,13 @@ function importCSV(input){
   };
   reader.readAsText(input.files[0],"windows-1252");
 }
-
+ 
 function getRB(rid){for(var i=0;i<boats.length;i++){if(boats[i].crew.indexOf(rid)>=0)return boats[i].name;}return null;}
 function rmFromBoats(rid){boats.forEach(function(b){var i=b.crew.indexOf(rid);if(i>=0)b.crew.splice(i,1);});}
-
+ 
 function toggleAtt(id){att[id]=(att[id]===true)?false:true;if(!att[id])rmFromBoats(id);renderAtt();renderBoats();}
 function markAll(v){filt(catP).forEach(function(r){att[r.id]=v;if(!v)rmFromBoats(r.id);});renderAtt();renderBoats();}
-
+ 
 function renderAtt(){
   var el=document.getElementById("attList"),cb=document.getElementById("cbar");
   if(!el||!cb)return;
@@ -413,7 +413,7 @@ function renderAtt(){
       +"<span class='spill'>"+lbl+"</span></div>";
   }).join("");
 }
-
+ 
 function addBoat(){
   if(boats.length>=MAXBOATS)return flash("Maximum "+MAXBOATS+" bateaux.");
   var tp=["4X","4-","2X","2-","1X","Ergo"];
@@ -424,7 +424,7 @@ function removeBoat(i){boats.splice(i,1);renderBoats();renderAtt();}
 function clearBoats(){if(!boats.length)return;if(!confirm("Effacer tous les bateaux ?"))return;boats=[];renderBoats();renderAtt();}
 function rmSeat(bi,rid){var i=boats[bi].crew.indexOf(rid);if(i>=0)boats[bi].crew.splice(i,1);renderBoats();renderAtt();}
 function setBName(bi,v){boats[bi].name=v;renderBoats();}
-
+ 
 function renderBoats(){
   var el=document.getElementById("bgrid"),ci=document.getElementById("boatInfo");
   if(!el)return;
@@ -448,7 +448,7 @@ function renderBoats(){
       +"</div>";
   }).join("");
 }
-
+ 
 var _msBi=-1,_msSel=[];
 function openMs(bi){_msBi=bi;_msSel=[];renderMs();document.getElementById("msPanel").classList.add("open");}
 function closeMs(){document.getElementById("msPanel").classList.remove("open");_msBi=-1;_msSel=[];}
@@ -489,7 +489,7 @@ function confirmMs(){
   _msSel.forEach(function(rid){if(boats[_msBi].crew.length<ms)boats[_msBi].crew.push(rid);});
   closeMs();renderBoats();renderAtt();
 }
-
+ 
 function saveSess(){
   var date=document.getElementById("sDate").value;
   if(!date)return flash("Choisissez une date.");
@@ -509,7 +509,7 @@ function saveSess(){
     .then(function(){rowers.forEach(function(r){att[r.id]=false;});boats=[];renderAtt();renderBoats();ld(false);flash("Seance enregistree: "+presCount+"/"+rowers.length,"ok");})
     .catch(function(e){flash("Erreur: "+e.message);ld(false);});
 }
-
+ 
 function renderStats(){
   var kg=document.getElementById("kgrid"),rl=document.getElementById("rkList"),al=document.getElementById("alList");
   if(!kg)return;
@@ -543,7 +543,7 @@ function renderStats(){
       +"<div class='btrack'><div class='bfill bbad' style='width:"+r.rate+"%'></div></div></div></div>";
   }).join(""):"<div style='color:#6a8fad;font-size:13px;padding:6px 0'>Tous superieur a 60%.</div>";
 }
-
+ 
 function openRD(rid){
   var r=rowers.find(function(x){return x.id===rid;});if(!r)return;
   var rows=sessions.map(function(s){
@@ -568,7 +568,7 @@ function openRD(rid){
     +"</div><div class='slbl'>Detail seances</div>"+rh;
   document.getElementById("mbg").classList.add("open");
 }
-
+ 
 function renderHist(){
   var el=document.getElementById("hList");if(!el)return;
   if(!sessions.length){el.innerHTML="<div class='empty'><div class='ico'>...</div>Aucune seance.</div>";return;}
@@ -585,7 +585,7 @@ function renderHist(){
       +"</div>";
   }).join("");
 }
-
+ 
 function openSM(id){
   var s=sessions.find(function(x){return x.id===id;});if(!s)return;
   var pres=(s.players||[]).filter(function(p){return p.present;});
@@ -603,7 +603,7 @@ function openSM(id){
     +(abs.length?"<div class='slbl'>Absents</div>"+abs.map(function(p){return "<span class='nchip ncr'>"+xe(p.name)+"</span>";}).join(""):"");
   document.getElementById("mbg").classList.add("open");
 }
-
+ 
 function delSess(id,dateStr){
   if(!confirm("Supprimer la seance du "+dateStr+" ?"))return;
   ld(true);
