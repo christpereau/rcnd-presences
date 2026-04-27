@@ -290,7 +290,7 @@ function buildCatTabs(){
     var cur=isP?activeCatP:activeCatR;
     var fn=isP?"setPresenceCat":"setRowerCat";
     el.innerHTML=["Tous"].concat(CATS).map(function(c){
-      return '<button class="cat-tab'+(cur===c?" active":"")+'" onclick="'+fn+'(''+c+'')">'+c+'</button>';
+      return '<button class="cat-tab'+(cur===c?' active':'')+'" onclick="'+fn+'("+c+")">'+(c||'Tous')+'</button>';
     }).join("");
   });
 }
@@ -355,7 +355,7 @@ function renderRowers(){
   var list=filteredRowers(activeCatR);
   if(!list.length){ el.innerHTML='<div class="empty"><div class="ico">🚣</div>Aucun rameur dans cette catégorie.</div>'; return; }
   el.innerHTML=list.map(function(r){
-    return '<div class="rower-item"><div class="rower-left"><div class="avatar">'+esc(r.name[0].toUpperCase())+'</div><div style="min-width:0"><div class="rower-name">'+esc(r.name)+'<span class="badge-cat cat-'+esc(r.cat)+'">'+esc(r.cat)+'</span></div><div class="rower-meta">'+(r.licence?"🪪 "+esc(r.licence):"Pas de licence")+'</div></div></div><button class="btn btn-danger" onclick="removeRower(''+r.id+'')">Retirer</button></div>';
+    return '<div class="rower-item"><div class="rower-left"><div class="avatar">'+esc(r.name[0].toUpperCase())+'</div><div style="min-width:0"><div class="rower-name">'+esc(r.name)+'<span class="badge-cat cat-'+esc(r.cat)+'">'+esc(r.cat)+'</span></div><div class="rower-meta">'+(r.licence?"🪪 "+esc(r.licence):"Pas de licence")+'</div></div></div><button class="btn btn-danger" onclick="removeRower("+r.id+"">Retirer</button></div>';
   }).join("");
 }
 
@@ -408,7 +408,7 @@ function renderAttendance(){
   cb.innerHTML='<div class="counter-item"><span class="counter-val c-green">'+pres+'</span><span style="font-size:12px;color:var(--muted)">présents</span></div><span class="sep">|</span><div class="counter-item"><span class="counter-val c-red">'+abs+'</span><span style="font-size:12px;color:var(--muted)">absents</span></div><span class="sep">|</span><div class="counter-item"><span class="counter-val c-gray">'+nd+'</span><span style="font-size:12px;color:var(--muted)">N/A</span></div><div style="flex:1"></div><span style="font-size:11px;color:var(--muted)">'+list.length+' rameur'+(list.length>1?"s":"")+'</span>';
   el.innerHTML=list.map(function(r){
     var v=att[r.id],cls=v===true?"present":v===false?"absent":"neutral",lbl=v===true?"✓ Présent":v===false?"✗ Absent":"— ?";
-    return '<div class="att-item '+cls+'" onclick="toggleAtt(''+r.id+'')"><div class="att-left"><div class="avatar">'+esc(r.name[0].toUpperCase())+'</div><div style="min-width:0"><div class="att-name">'+esc(r.name)+'<span class="badge-cat cat-'+esc(r.cat)+'">'+esc(r.cat)+'</span></div><div class="att-meta">'+(r.licence?esc(r.licence):"")+'</div></div></div><span class="status-pill">'+lbl+'</span></div>';
+    return '<div class="att-item '+cls+'" onclick="toggleAtt("+r.id+""><div class="att-left"><div class="avatar">'+esc(r.name[0].toUpperCase())+'</div><div style="min-width:0"><div class="att-name">'+esc(r.name)+'<span class="badge-cat cat-'+esc(r.cat)+'">'+esc(r.cat)+'</span></div><div class="att-meta">'+(r.licence?esc(r.licence):"")+'</div></div></div><span class="status-pill">'+lbl+'</span></div>';
   }).join("");
 }
 
@@ -514,7 +514,7 @@ function renderHistory(){
   if(!sessions.length){ el.innerHTML='<div class="empty"><div class="ico">📅</div>Aucune séance.</div>'; return; }
   el.innerHTML=sessions.map(function(s){
     var pct=Math.round(s.presCount/s.total*100);
-    return '<div class="hist-item" onclick="openModal(''+s.id+'')"><div><div class="hist-date">'+fmtDate(s.date)+'<span class="chip">'+esc(s.type||"Entraînement")+'</span>'+(s.label?'<span class="chip chip-gold">'+esc(s.label)+'</span>':"")+'</div><div class="hist-sub">'+s.presCount+' présents · '+(s.total-s.presCount)+' absents · '+s.total+' rameurs</div></div><div class="hist-pct">'+pct+'%</div></div>';
+    return '<div class="hist-item" onclick="openModal("+s.id+""><div><div class="hist-date">'+fmtDate(s.date)+'<span class="chip">'+esc(s.type||"Entraînement")+'</span>'+(s.label?'<span class="chip chip-gold">'+esc(s.label)+'</span>':"")+'</div><div class="hist-sub">'+s.presCount+' présents · '+(s.total-s.presCount)+' absents · '+s.total+' rameurs</div></div><div class="hist-pct">'+pct+'%</div></div>';
   }).join("");
 }
 
