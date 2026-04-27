@@ -514,42 +514,87 @@ function renderStats(){
   var kg=document.getElementById("kgrid"),rl=document.getElementById("rkList"),al=document.getElementById("alList");
   if(!kg)return;
   if(!sessions.length){kg.innerHTML="<div class='empty' style='grid-column:1/-1'><div class='ico'>...</div>Aucune seance.</div>";rl.innerHTML=al.innerHTML="";return;}
-  var tp=sessions.reduce(function(s,x){return s+x.presCount;},0);
-  var ts=sessions.reduce(function(s,x){return s+x.total;},0);
-  var avg=ts?Math.round(tp/ts*100):0;
-  kg.innerHTML="<div class='kpi'><div class='kval'>"+sessions.length+"</div><div class='klbl'>Seances</div></div>"
+
+  var sesReg=sessions.filter(function(s){var t=(s.type||"").toLowerCase();return t.indexOf("regate")>=0||t.indexOf("r\u00e9gate")>=0;});
+  var sesTrn=sessions.filter(function(s){var t=(s.type||"").toLowerCase();return t.indexOf("regate")<0&&t.indexOf("r\u00e9gate")<0;});
+
+  function uniqueDays(sl){var d={};sl.forEach(function(s){d[s.date]=true;});return Object.keys(d).length;}
+
+  function computePerRower(sl){
+    return rowers.map(function(r){
+      var byDate={};
+      sl.forEach(function(s){
+        if(!byDate[s.date])byDate[s.date]={present:false,seen:false};
+        var rec=(s.players||[]).find(function(x){return x.id===r.id;});
+        if(rec){byDate[s.date].seen=true;if(rec.present)byDate[s.date].present=true;}
+      });
+      var p=0,a=0;
+      Object.keys(byDate).forEach(function(k){var d=byDate[k];if(!d.seen)return;if(d.present)p++;else a++;});
+      var rate=(p+a)?Math.round(p/(p+a)*100):null;
+      return {id:r.id,name:r.name,cat:r.cat,p:p,a:a,rate:rate};
+    }).sort(function(a,b){return(b.rate===null?-1:b.rate)-(a.rate===null?-1:a.rate);});
+  }
+
+  var psAll=computePerRower(sessions);
+  var psReg=computePerRower(sesReg);
+  var psTrn=computePerRower(sesTrn);
+  var daysAll=uniqueDays(sessions),daysReg=uniqueDays(sesReg),daysTrn=uniqueDays(sesTrn);
+
+  kg.innerHTML="<div class='kpi'><div class='kval'>"+daysAll+"</div><div class='klbl'>Jours total</div></div>"
     +"<div class='kpi'><div class='kval'>"+rowers.length+"</div><div class='klbl'>Rameurs</div></div>"
-    +"<div class='kpi'><div class='kval'>"+avg+"%</div><div class='klbl'>Taux moyen</div></div>"
-    +"<div class='kpi'><div class='kval'>"+tp+"</div><div class='klbl'>Presences</div></div>";
-  var ps=rowers.map(function(r){
-    var byDate={};
-    sessions.forEach(function(s){
-      if(!byDate[s.date])byDate[s.date]={present:false,seen:false};
-      var rec=(s.players||[]).find(function(x){return x.id===r.id;});
-      if(rec){byDate[s.date].seen=true;if(rec.present)byDate[s.date].present=true;}
-    });
-    var p=0,a=0;
-    Object.keys(byDate).forEach(function(k){var d=byDate[k];if(!d.seen)return;if(d.present)p++;else a++;});
-    var rate=(p+a)?Math.round(p/(p+a)*100):null;
-    return {id:r.id,name:r.name,cat:r.cat,p:p,a:a,rate:rate};
-  }).sort(function(a,b){return(b.rate===null?-1:b.rate)-(a.rate===null?-1:a.rate);});
-  rl.innerHTML=ps.map(function(r,i){
+    +"<div class='kpi'><div class='kval' style='color:var(--spray)'>"+daysReg+"</div><div class='klbl'>Jours regates</div></div>"
+    +"<div class='kpi'><div class='kval' style='color:var(--green)'>"+daysTrn+"</div><div class='klbl'>Jours entr.</div></div>";
+
+  function rankRow(r,i){
     var gc=i===0?"g1":i===1?"g2":i===2?"g3":"gx",pct=r.rate||0,c=cc(r.cat);
-    return "<div class='rrank' onclick='openRD(\""+r.id+"\")'><div class='rn "+gc+"'>"+(i+1)+"</div>"
+    var div=document.createElement("div");
+    div.className="rrank";
+    div.setAttribute("data-rid",r.id);
+    div.onclick=function(){openRD(this.getAttribute("data-rid"));};
+    div.innerHTML="<div class='rn "+gc+"'>"+(i+1)+"</div>"
       +"<div class='av' style='width:28px;height:28px;font-size:11px'>"+xe(r.name[0])+"</div>"
       +"<div class='bwrap'><div class='btop'><span>"+xe(r.name)+"<span class='bcat "+c+"' style='margin-left:4px'>"+xe(r.cat)+"</span></span>"
-      +"<span style='color:#6a8fad;flex-shrink:0'>"+r.p+"/"+(r.p+r.a)+" - "+(r.rate!==null?r.rate+"%":"N/A")+"</span></div>"
-      +"<div class='btrack'><div class='bfill bok' style='width:"+pct+"%'></div></div></div></div>";
-  }).join("")||"<div class='empty'>Aucune donnee.</div>";
-  var bad=ps.filter(function(r){return r.rate!==null&&r.rate<60;});
-  al.innerHTML=bad.length?bad.map(function(r){
-    return "<div class='rrank' onclick='openRD(\""+r.id+"\")'>"
-      +"<div class='av' style='width:28px;height:28px;font-size:11px;border-color:#e05c3a'>"+xe(r.name[0])+"</div>"
-      +"<div class='bwrap'><div class='btop'><span>"+xe(r.name)+"</span><span style='color:#e05c3a'>"+r.rate+"%</span></div>"
-      +"<div class='btrack'><div class='bfill bbad' style='width:"+r.rate+"%'></div></div></div></div>";
-  }).join(""):"<div style='color:#6a8fad;font-size:13px;padding:6px 0'>Tous superieur a 60%.</div>";
+      +"<span style='color:#6a8fad;flex-shrink:0'>"+r.p+"/"+(r.p+r.a)+" j - "+(r.rate!==null?r.rate+"%":"N/A")+"</span></div>"
+      +"<div class='btrack'><div class='bfill bok' style='width:"+pct+"%'></div></div></div>";
+    return div;
+  }
+
+  function appendBlock(container,ps,title,color){
+    if(!ps.length)return;
+    var lbl=document.createElement("div");
+    lbl.style.cssText="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:"+color+";margin:12px 0 5px;font-weight:700";
+    lbl.textContent=title;
+    container.appendChild(lbl);
+    ps.forEach(function(r,i){container.appendChild(rankRow(r,i));});
+  }
+
+  rl.innerHTML="";
+  if(psAll.length){
+    appendBlock(rl,psAll,"Classement global (jours dedupl.)","var(--gold)");
+    if(sesReg.length)appendBlock(rl,psReg,"Regates uniquement","var(--spray)");
+    if(sesTrn.length)appendBlock(rl,psTrn,"Entrainements uniquement","var(--green)");
+  } else {
+    rl.innerHTML="<div class='empty'>Aucune donnee.</div>";
+  }
+
+  var bad=psAll.filter(function(r){return r.rate!==null&&r.rate<60;});
+  al.innerHTML="";
+  if(bad.length){
+    bad.forEach(function(r){
+      var div=document.createElement("div");
+      div.className="rrank";
+      div.setAttribute("data-rid",r.id);
+      div.onclick=function(){openRD(this.getAttribute("data-rid"));};
+      div.innerHTML="<div class='av' style='width:28px;height:28px;font-size:11px;border-color:#e05c3a'>"+xe(r.name[0])+"</div>"
+        +"<div class='bwrap'><div class='btop'><span>"+xe(r.name)+"</span><span style='color:#e05c3a'>"+r.rate+"%</span></div>"
+        +"<div class='btrack'><div class='bfill bbad' style='width:"+r.rate+"%'></div></div></div>";
+      al.appendChild(div);
+    });
+  } else {
+    al.innerHTML="<div style='color:#6a8fad;font-size:13px;padding:6px 0'>Tous superieur a 60%.</div>";
+  }
 }
- 
+
 function openRD(rid){
   var r=rowers.find(function(x){return x.id===rid;});if(!r)return;
   var rows=sessions.map(function(s){
