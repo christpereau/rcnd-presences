@@ -577,7 +577,7 @@ function renderStats(){
     rl.innerHTML="<div class='empty'>Aucune donnee.</div>";
   }
 
-  var bad=psAll.filter(function(r){return r.rate!==null&&r.rate<60;});
+  var bad=psAll.filter(function(r){return r.rate!==null&&r.rate<30;});
   al.innerHTML="";
   if(bad.length){
     bad.forEach(function(r){
