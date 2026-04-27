@@ -290,7 +290,7 @@ function buildCatTabs(){
     var cur=isP?activeCatP:activeCatR;
     var fn=isP?"setPresenceCat":"setRowerCat";
     el.innerHTML=["Tous"].concat(CATS).map(function(c){
-      return '<button class="cat-tab'+(cur===c?' active':'')+'" onclick="'+fn+'("+c+")">'+(c||'Tous')+'</button>';
+      return '<button class="cat-tab'+(cur===c?" active":"")+'" onclick="'+fn+'(''+c+'')">'+c+'</button>';
     }).join("");
   });
 }
@@ -355,7 +355,7 @@ function renderRowers(){
   var list=filteredRowers(activeCatR);
   if(!list.length){ el.innerHTML='<div class="empty"><div class="ico">🚣</div>Aucun rameur dans cette catégorie.</div>'; return; }
   el.innerHTML=list.map(function(r){
-    return '<div class="rower-item"><div class="rower-left"><div class="avatar">'+esc(r.name[0].toUpperCase())+'</div><div style="min-width:0"><div class="rower-name">'+esc(r.name)+'<span class="badge-cat cat-'+esc(r.cat)+'">'+esc(r.cat)+'</span></div><div class="rower-meta">'+(r.licence?"🪪 "+esc(r.licence):"Pas de licence")+'</div></div></div><button class="btn btn-danger" onclick="removeRower("+r.id+"">Retirer</button></div>';
+    return '<div class="rower-item"><div class="rower-left"><div class="avatar">'+esc(r.name[0].toUpperCase())+'</div><div style="min-width:0"><div class="rower-name">'+esc(r.name)+'<span class="badge-cat cat-'+esc(r.cat)+'">'+esc(r.cat)+'</span></div><div class="rower-meta">'+(r.licence?"🪪 "+esc(r.licence):"Pas de licence")+'</div></div></div><button class="btn btn-danger" onclick="removeRower(''+r.id+'')">Retirer</button></div>';
   }).join("");
 }
 
@@ -408,7 +408,7 @@ function renderAttendance(){
   cb.innerHTML='<div class="counter-item"><span class="counter-val c-green">'+pres+'</span><span style="font-size:12px;color:var(--muted)">présents</span></div><span class="sep">|</span><div class="counter-item"><span class="counter-val c-red">'+abs+'</span><span style="font-size:12px;color:var(--muted)">absents</span></div><span class="sep">|</span><div class="counter-item"><span class="counter-val c-gray">'+nd+'</span><span style="font-size:12px;color:var(--muted)">N/A</span></div><div style="flex:1"></div><span style="font-size:11px;color:var(--muted)">'+list.length+' rameur'+(list.length>1?"s":"")+'</span>';
   el.innerHTML=list.map(function(r){
     var v=att[r.id],cls=v===true?"present":v===false?"absent":"neutral",lbl=v===true?"✓ Présent":v===false?"✗ Absent":"— ?";
-    return '<div class="att-item '+cls+'" onclick="toggleAtt("+r.id+""><div class="att-left"><div class="avatar">'+esc(r.name[0].toUpperCase())+'</div><div style="min-width:0"><div class="att-name">'+esc(r.name)+'<span class="badge-cat cat-'+esc(r.cat)+'">'+esc(r.cat)+'</span></div><div class="att-meta">'+(r.licence?esc(r.licence):"")+'</div></div></div><span class="status-pill">'+lbl+'</span></div>';
+    return '<div class="att-item '+cls+'" onclick="toggleAtt(''+r.id+'')"><div class="att-left"><div class="avatar">'+esc(r.name[0].toUpperCase())+'</div><div style="min-width:0"><div class="att-name">'+esc(r.name)+'<span class="badge-cat cat-'+esc(r.cat)+'">'+esc(r.cat)+'</span></div><div class="att-meta">'+(r.licence?esc(r.licence):"")+'</div></div></div><span class="status-pill">'+lbl+'</span></div>';
   }).join("");
 }
 
@@ -432,80 +432,60 @@ function saveSession(){
 function renderStats(){
   var kg=document.getElementById("kpiGrid"),rl=document.getElementById("rankList"),al=document.getElementById("alertList");
   if(!kg) return;
-  if(!sessions.length){ kg.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="ico">📊</div>Aucune séance.</div>'; rl.innerHTML=al.innerHTML=""; return; }
+  if(!sessions.length){ kg.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="ico">&#x1F4CA;</div>Aucune séance.</div>'; rl.innerHTML=al.innerHTML=""; return; }
 
-  // ── Séparation régates / entraînements ──────────────────────────────────
-  var sesReg = sessions.filter(function(s){ return (s.type||"").toLowerCase().indexOf("régate")!==-1 || (s.type||"").toLowerCase().indexOf("regate")!==-1; });
-  var sesTrn = sessions.filter(function(s){ return (s.type||"").toLowerCase().indexOf("régate")===-1 && (s.type||"").toLowerCase().indexOf("regate")===-1; });
+  var sesReg=sessions.filter(function(s){ return (s.type||"").toLowerCase().indexOf("régate")!==-1||(s.type||"").toLowerCase().indexOf("regate")!==-1; });
+  var sesTrn=sessions.filter(function(s){ return (s.type||"").toLowerCase().indexOf("régate")===-1&&(s.type||"").toLowerCase().indexOf("regate")===-1; });
 
-  // ── Dédoublonnage par date ───────────────────────────────────────────────
-  // Pour chaque rameur : sur une même date, si au moins une séance = présent → présent pour ce jour
-  function computePerRower(sesList){
+  function uniqueDays(sl){ var d={}; sl.forEach(function(s){ d[s.date]=true; }); return Object.keys(d).length; }
+
+  function computePerRower(sl){
     return rowers.map(function(r){
-      // Regrouper les séances par date
       var byDate={};
-      sesList.forEach(function(ses){
-        var d=ses.date;
-        if(!byDate[d]) byDate[d]={present:false,seen:false};
+      sl.forEach(function(ses){
+        if(!byDate[ses.date]) byDate[ses.date]={present:false,seen:false};
         var rec=(ses.players||[]).find(function(x){ return x.id===r.id; });
-        if(rec){
-          byDate[d].seen=true;
-          if(rec.present) byDate[d].present=true;
-        }
+        if(rec){ byDate[ses.date].seen=true; if(rec.present) byDate[ses.date].present=true; }
       });
       var p=0,a=0;
-      Object.values(byDate).forEach(function(day){
-        if(!day.seen) return;
-        if(day.present) p++; else a++;
-      });
+      Object.keys(byDate).forEach(function(k){ var day=byDate[k]; if(!day.seen) return; if(day.present) p++; else a++; });
       var rate=(p+a)?Math.round(p/(p+a)*100):null;
       return {id:r.id,name:r.name,cat:r.cat,p:p,a:a,rate:rate};
     }).sort(function(a,b){ return (b.rate===null?-1:b.rate)-(a.rate===null?-1:a.rate); });
   }
 
-  // Jours uniques (dédoublonnés) par type
-  function uniqueDays(sesList){ var d={}; sesList.forEach(function(s){ d[s.date]=true; }); return Object.keys(d).length; }
+  var psAll=computePerRower(sessions);
+  var psReg=computePerRower(sesReg);
+  var psTrn=computePerRower(sesTrn);
+  var daysAll=uniqueDays(sessions);
+  var daysReg=uniqueDays(sesReg);
+  var daysTrn=uniqueDays(sesTrn);
 
-  var psAll = computePerRower(sessions);
-  var psReg = computePerRower(sesReg);
-  var psTrn = computePerRower(sesTrn);
-
-  var daysAll = uniqueDays(sessions);
-  var daysReg = uniqueDays(sesReg);
-  var daysTrn = uniqueDays(sesTrn);
-
-  var totalPres=sessions.reduce(function(s,x){ return s+x.presCount; },0);
-  var totalSlots=sessions.reduce(function(s,x){ return s+x.total; },0);
-  var avg=totalSlots?Math.round(totalPres/totalSlots*100):0;
-
-  // ── KPI Grid ─────────────────────────────────────────────────────────────
   kg.innerHTML=
     '<div class="kpi"><div class="kpi-val">'+daysAll+'</div><div class="kpi-lbl">Jours (total)</div></div>'+
     '<div class="kpi"><div class="kpi-val">'+rowers.length+'</div><div class="kpi-lbl">Rameurs</div></div>'+
     '<div class="kpi"><div class="kpi-val" style="color:var(--spray)">'+daysReg+'</div><div class="kpi-lbl">Jours régates</div></div>'+
-    '<div class="kpi"><div class="kpi-val" style="color:var(--green)">'+daysTrn+'</div><div class="kpi-lbl">Jours entraîn.</div></div>';
+    '<div class="kpi"><div class="kpi-val" style="color:var(--green)">'+daysTrn+'</div><div class="kpi-lbl">Jours entr.</div></div>';
 
-  // ── Fonction helper : bloc de classement ─────────────────────────────────
-  function rankBlock(ps, title, color){
-    if(!ps.length) return '';
+  function rankBlock(ps,title,color){
+    if(!ps.length) return "";
     var rows=ps.map(function(r,i){
       var gc=i===0?"g1":i===1?"g2":i===2?"g3":"gx",pct=r.rate||0;
-      return '<div class="rank-item"><div class="rank-n '+gc+'">'+(i+1)+'</div><div class="avatar" style="width:30px;height:30px;font-size:12px">'+esc(r.name[0])+'</div><div class="bar-wrap"><div class="bar-top"><span>'+esc(r.name)+'<span class="badge-cat cat-'+esc(r.cat)+'" style="margin-left:5px">'+esc(r.cat)+'</span></span><span style="color:var(--muted);flex-shrink:0">'+r.p+'/'+(r.p+r.a)+' j — <b style="color:var(--text)">'+(r.rate!==null?r.rate+"%":"N/A")+'</b></span></div><div class="bar-track"><div class="bar-fill bf-ok" style="width:'+pct+'%"></div></div></div></div>';
+      return '<div class="rank-item"><div class="rank-n '+gc+'">'+( i+1)+'</div><div class="avatar" style="width:30px;height:30px;font-size:12px">'+esc(r.name[0])+'</div><div class="bar-wrap"><div class="bar-top"><span>'+esc(r.name)+'<span class="badge-cat cat-'+esc(r.cat)+'" style="margin-left:5px">'+esc(r.cat)+'</span></span><span style="color:var(--muted);flex-shrink:0">'+r.p+'/'+(r.p+r.a)+' j &mdash; <b style="color:var(--text)">'+( r.rate!==null?r.rate+"%":"N/A")+'</b></span></div><div class="bar-track"><div class="bar-fill bf-ok" style="width:'+pct+'%"></div></div></div></div>';
     }).join("");
     return '<div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:'+color+';margin:14px 0 6px;font-weight:700">'+title+'</div>'+rows;
   }
 
-  rl.innerHTML=
-    rankBlock(psAll,  "🏅 Classement global (jours dédoublonnés)", "var(--gold)")+
-    (sesReg.length ? rankBlock(psReg, "⛵ Régates uniquement", "var(--spray)") : "")+
-    (sesTrn.length ? rankBlock(psTrn, "🏋️ Entraînements uniquement", "var(--green)") : "")
-    || '<div class="empty">Aucune donnée.</div>';
+  rl.innerHTML=(
+    rankBlock(psAll,"Classement global (jours dédoublonnes)","var(--gold)")+
+    (sesReg.length?rankBlock(psReg,"Regates uniquement","var(--spray)"):"") +
+    (sesTrn.length?rankBlock(psTrn,"Entrainements uniquement","var(--green)"):""))
+    ||'<div class="empty">Aucune donnée.</div>';
 
-  // ── Alertes < 60% (global) ────────────────────────────────────────────────
   var bad=psAll.filter(function(r){ return r.rate!==null&&r.rate<60; });
   al.innerHTML=bad.length?bad.map(function(r){
     return '<div class="rank-item"><div class="avatar" style="width:30px;height:30px;font-size:12px;border-color:var(--coral)">'+esc(r.name[0])+'</div><div class="bar-wrap"><div class="bar-top"><span>'+esc(r.name)+'</span><span style="color:var(--coral)">'+r.rate+'%</span></div><div class="bar-track"><div class="bar-fill bf-bad" style="width:'+r.rate+'%"></div></div></div></div>';
-  }).join(""):"<div style='color:var(--muted);font-size:13px;padding:6px 0'>👍 Tous > 60%.</div>";
+  }).join(""):'<div style="color:var(--muted);font-size:13px;padding:6px 0">Tous au-dessus de 60%.</div>';
 }
 
 // ---- HISTORY ----
@@ -514,7 +494,7 @@ function renderHistory(){
   if(!sessions.length){ el.innerHTML='<div class="empty"><div class="ico">📅</div>Aucune séance.</div>'; return; }
   el.innerHTML=sessions.map(function(s){
     var pct=Math.round(s.presCount/s.total*100);
-    return '<div class="hist-item" onclick="openModal("+s.id+""><div><div class="hist-date">'+fmtDate(s.date)+'<span class="chip">'+esc(s.type||"Entraînement")+'</span>'+(s.label?'<span class="chip chip-gold">'+esc(s.label)+'</span>':"")+'</div><div class="hist-sub">'+s.presCount+' présents · '+(s.total-s.presCount)+' absents · '+s.total+' rameurs</div></div><div class="hist-pct">'+pct+'%</div></div>';
+    return '<div class="hist-item" onclick="openModal(''+s.id+'')"><div><div class="hist-date">'+fmtDate(s.date)+'<span class="chip">'+esc(s.type||"Entraînement")+'</span>'+(s.label?'<span class="chip chip-gold">'+esc(s.label)+'</span>':"")+'</div><div class="hist-sub">'+s.presCount+' présents · '+(s.total-s.presCount)+' absents · '+s.total+' rameurs</div></div><div class="hist-pct">'+pct+'%</div></div>';
   }).join("");
 }
 
