@@ -208,8 +208,8 @@ input::placeholder{color:var(--muted)}select option{background:var(--hull)}
 </div>
 
 <!-- Firebase compat SDK (works on all mobile browsers) -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <script>
 // ---- FIREBASE INIT ----
 firebase.initializeApp({
@@ -283,6 +283,12 @@ function showPage(name,btn){
 }
 
 // ---- CAT TABS ----
+function catTabClick(btn){
+  var fn=btn.getAttribute("data-fn");
+  var cat=btn.getAttribute("data-cat");
+  if(fn==="setPresenceCat") setPresenceCat(cat);
+  else setRowerCat(cat);
+}
 function buildCatTabs(){
   ["presenceCatTabs","rowerCatTabs"].forEach(function(id){
     var el=document.getElementById(id); if(!el) return;
@@ -290,7 +296,8 @@ function buildCatTabs(){
     var cur=isP?activeCatP:activeCatR;
     var fn=isP?"setPresenceCat":"setRowerCat";
     el.innerHTML=["Tous"].concat(CATS).map(function(c){
-      return '<button class="cat-tab'+(cur===c?' active':'')+'" onclick="'+fn+'('+c+')">'+(c||'Tous')+'</button>';
+      var active=(c===cur||(!c&&!cur))?' active':'';
+      return '<button class="cat-tab'+active+'" data-fn="'+fn+'" data-cat="'+(c||'')+'" onclick="catTabClick(this)">'+(c||'Tous')+'</button>';
     }).join("");
   });
 }
@@ -344,18 +351,21 @@ function addRower(){
     .catch(function(e){ flash("Erreur: "+e.message); setLoading(false); });
 }
 
+function toggleAttById(el){ toggleAtt(el.getAttribute("data-id")); }
+function openModalById(el){ openModal(el.getAttribute("data-id")); }
 function removeRower(id){
   if(!confirm("Retirer ce rameur ?")) return;
   setLoading(true);
   db.collection("rowers").doc(id).delete().then(function(){ delete att[id]; setLoading(false); }).catch(function(e){ flash("Erreur: "+e.message); setLoading(false); });
 }
 
+function removeRowerById(btn){ var id=btn.getAttribute("data-id"); if(id) removeRower(id); }
 function renderRowers(){
   var el=document.getElementById("rowerList"); if(!el) return;
   var list=filteredRowers(activeCatR);
-  if(!list.length){ el.innerHTML='<div class="empty"><div class="ico">🚣</div>Aucun rameur dans cette catégorie.</div>'; return; }
+  if(!list.length){ el.innerHTML='<div class="empty"><div class="ico">&#x1F6A3;</div>Aucun rameur.</div>'; return; }
   el.innerHTML=list.map(function(r){
-    return '<div class="rower-item"><div class="rower-left"><div class="avatar">'+esc(r.name[0].toUpperCase())+'</div><div style="min-width:0"><div class="rower-name">'+esc(r.name)+'<span class="badge-cat cat-'+esc(r.cat)+'">'+esc(r.cat)+'</span></div><div class="rower-meta">'+(r.licence?"🪪 "+esc(r.licence):"Pas de licence")+'</div></div></div><button class="btn btn-danger" onclick="removeRower('"+r.id+"')">Retirer</button></div>';
+    return '<div class="rower-item"><div class="rower-left"><div class="avatar">'+esc(r.name[0].toUpperCase())+'</div><div style="min-width:0"><div class="rower-name">'+esc(r.name)+'<span class="badge-cat cat-'+esc(r.cat)+'">'+esc(r.cat)+'</span></div><div class="rower-meta">'+(r.licence?esc(r.licence):'Pas de licence')+'</div></div></div><button class="btn btn-danger" data-id="'+r.id+'" onclick="removeRowerById(this)">Retirer</button></div>';
   }).join("");
 }
 
@@ -364,8 +374,7 @@ function importCSV(input){
   if(!input.files[0]) return;
   var reader=new FileReader();
   reader.onload=function(e){
-    var lines=e.target.result.split("
-");
+    var lines=e.target.result.split("\n");
     var ALLOWED=["U13","U15","U17","U19","U23"];
     var added=0,dup=0;
     var existing=new Set(rowers.map(function(r){ return r.name.toLowerCase(); }));
@@ -408,7 +417,7 @@ function renderAttendance(){
   cb.innerHTML='<div class="counter-item"><span class="counter-val c-green">'+pres+'</span><span style="font-size:12px;color:var(--muted)">présents</span></div><span class="sep">|</span><div class="counter-item"><span class="counter-val c-red">'+abs+'</span><span style="font-size:12px;color:var(--muted)">absents</span></div><span class="sep">|</span><div class="counter-item"><span class="counter-val c-gray">'+nd+'</span><span style="font-size:12px;color:var(--muted)">N/A</span></div><div style="flex:1"></div><span style="font-size:11px;color:var(--muted)">'+list.length+' rameur'+(list.length>1?"s":"")+'</span>';
   el.innerHTML=list.map(function(r){
     var v=att[r.id],cls=v===true?"present":v===false?"absent":"neutral",lbl=v===true?"✓ Présent":v===false?"✗ Absent":"— ?";
-    return '<div class="att-item '+cls+'" onclick="toggleAtt('"+r.id+"')"><div class="att-left"><div class="avatar">'+esc(r.name[0].toUpperCase())+'</div><div style="min-width:0"><div class="att-name">'+esc(r.name)+'<span class="badge-cat cat-'+esc(r.cat)+'">'+esc(r.cat)+'</span></div><div class="att-meta">'+(r.licence?esc(r.licence):"")+'</div></div></div><span class="status-pill">'+lbl+'</span></div>';
+    return '<div class="att-item '+cls+'" onclick="toggleAtt(\'+r.id+\')"><div class="att-left"><div class="avatar">'+esc(r.name[0].toUpperCase())+'</div><div style="min-width:0"><div class="att-name">'+esc(r.name)+'<span class="badge-cat cat-'+esc(r.cat)+'">'+esc(r.cat)+'</span></div><div class="att-meta">'+(r.licence?esc(r.licence):"")+'</div></div></div><span class="status-pill">'+lbl+'</span></div>';
   }).join("");
 }
 
@@ -494,7 +503,7 @@ function renderHistory(){
   if(!sessions.length){ el.innerHTML='<div class="empty"><div class="ico">📅</div>Aucune séance.</div>'; return; }
   el.innerHTML=sessions.map(function(s){
     var pct=Math.round(s.presCount/s.total*100);
-    return '<div class="hist-item" onclick="openModal('"+s.id+"')"><div><div class="hist-date">'+fmtDate(s.date)+'<span class="chip">'+esc(s.type||"Entraînement")+'</span>'+(s.label?'<span class="chip chip-gold">'+esc(s.label)+'</span>':"")+'</div><div class="hist-sub">'+s.presCount+' présents · '+(s.total-s.presCount)+' absents · '+s.total+' rameurs</div></div><div class="hist-pct">'+pct+'%</div></div>';
+    return '<div class="hist-item" onclick="openModal(\'+s.id+\')"><div><div class="hist-date">'+fmtDate(s.date)+'<span class="chip">'+esc(s.type||"Entraînement")+'</span>'+(s.label?'<span class="chip chip-gold">'+esc(s.label)+'</span>':"")+'</div><div class="hist-sub">'+s.presCount+' présents · '+(s.total-s.presCount)+' absents · '+s.total+' rameurs</div></div><div class="hist-pct">'+pct+'%</div></div>';
   }).join("");
 }
 
@@ -521,8 +530,7 @@ function exportCSV(){
     var cols=sorted.map(function(s){ var rec=(s.players||[]).find(function(p){ return p.name===name; }); return rec?(rec.present?"P":rec.absent?"A":"?"):"-"; });
     return [name,rower?rower.cat:"",rower?rower.licence:""].concat(cols).join(";");
   });
-  dl([header].concat(rows).join("
-"),"presences_rcnd.csv","text/csv;charset=utf-8");
+  dl([header].concat(rows).join("\n"),"presences_rcnd.csv","text/csv;charset=utf-8");
 }
 function exportJSON(){ if(!sessions.length) return flash("Aucune donnée."); dl(JSON.stringify({rowers:rowers,sessions:sessions},null,2),"rcnd_data.json","application/json"); }
 function dl(content,name,type){ var a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["﻿"+content],{type:type})); a.download=name; a.click(); }
