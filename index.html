@@ -195,7 +195,8 @@ select option{background:var(--hull)}
 <div class="card"><div class="clabel">Ajouter manuellement</div><div class="row">
   <input type="text" id="nNom" placeholder="Prenom Nom" style="flex:2;min-width:130px">
   <input type="text" id="nLic" placeholder="Licence" style="max-width:110px;flex:0 0 auto">
-  <select id="nCat" style="max-width:100px;flex:0 0 auto"><option value="">Cat.</option><option>U13</option><option>U15</option><option>U17</option><option>U19</option><option>U23</option></select>
+  <input type="number" id="nBirth" placeholder="Année naissance" min="2000" max="2020" style="max-width:130px;flex:0 0 auto" oninput="updateCatPreview()">
+  <span id="catPreview" style="font-size:12px;color:var(--spray);font-weight:700;white-space:nowrap"></span>
   <button class="btn bgold" onclick="addRower()">+ Ajouter</button>
 </div></div>
 <div class="ctabs" id="rTabs"></div>
@@ -337,14 +338,38 @@ db.collection("rowers").get().then(function(snap){
   }
 }).catch(function(e){console.warn(e);});
  
+function catFromBirth(y){
+  var age=new Date().getFullYear()-parseInt(y);
+  if(age<=10) return "U13";
+  if(age<=12) return "U13";
+  if(age<=14) return "U15";
+  if(age<=16) return "U17";
+  if(age<=18) return "U19";
+  if(age<=22) return "U23";
+  return "U23";
+}
+function updateEditCat(input){
+  var rid=input.getAttribute("data-rid");
+  var el=document.getElementById("eCatShow_"+rid);
+  if(!el)return;
+  var y=parseInt(input.value);
+  el.textContent=(input.value.length===4&&y>=2000&&y<=2020)?"→ "+catFromBirth(y):"";
+}
+function updateCatPreview(){
+  var y=document.getElementById("nBirth").value;
+  var el=document.getElementById("catPreview");
+  if(y&&y.length===4){el.textContent="→ "+catFromBirth(y);}else{el.textContent="";}
+}
 function addRower(){
   var name=document.getElementById("nNom").value.trim();
   if(!name)return flash("Entrez un nom.");
-  var cat=document.getElementById("nCat").value;
-  if(!cat)return flash("Choisissez une categorie.");
+  var cat="";
   ld(true);
-  db.collection("rowers").doc("r"+Date.now()).set({name:name,licence:document.getElementById("nLic").value.trim(),cat:cat})
-    .then(function(){document.getElementById("nNom").value="";document.getElementById("nLic").value="";document.getElementById("nCat").value="";ld(false);})
+  var birth=parseInt(document.getElementById("nBirth").value)||0;
+  var autoCat=birth?catFromBirth(birth):cat;
+  if(!autoCat)return flash("Entrez une année de naissance.");
+  db.collection("rowers").doc("r"+Date.now()).set({name:name,licence:document.getElementById("nLic").value.trim(),cat:autoCat,birthYear:birth||null})
+    .then(function(){document.getElementById("nNom").value="";document.getElementById("nLic").value="";document.getElementById("nBirth").value="";document.getElementById("catPreview").textContent="";ld(false);})
     .catch(function(e){flash("Erreur: "+e.message);ld(false);});
 }
 function removeRower(id){
@@ -357,8 +382,10 @@ function renderRowers(){
   var list=filt(catR);
   if(!list.length){el.innerHTML="<div class='empty'><div class='ico'>...</div>Aucun rameur.</div>";return;}
   el.innerHTML=list.map(function(r){
-    var c=cc(r.cat);
-    return "<div class='ritem'><div class='rleft'><div class='av'>"+xe(r.name[0].toUpperCase())+"</div><div style='min-width:0'><div class='rname'>"+xe(r.name)+"<span class='bcat "+c+"'>"+xe(r.cat)+"</span></div><div class='rmeta'>"+(r.licence?"Lic: "+xe(r.licence):"Pas de licence")+"</div></div></div>"
+    var dispCat=r.birthYear?catFromBirth(r.birthYear):(r.cat||"?");
+    var c=cc(dispCat);
+    var birthInfo=r.birthYear?" · "+r.birthYear:"";
+    return "<div class='ritem'><div class='rleft'><div class='av'>"+xe(r.name[0].toUpperCase())+"</div><div style='min-width:0'><div class='rname'>"+xe(r.name)+"<span class='bcat "+c+"'>"+dispCat+"</span></div><div class='rmeta'>"+(r.licence?"Lic: "+xe(r.licence):"Pas de licence")+birthInfo+"</div></div></div>"
       +"<div style='display:flex;gap:5px;flex-shrink:0'>"
       +"<button class='btn boar bsm' onclick='openRD(\""+r.id+"\")'>Detail</button>"
       +"<button class='btn bdanger' onclick='removeRower(\""+r.id+"\")'>Retirer</button>"
@@ -369,21 +396,87 @@ function importCSV(input){
   if(!input.files[0])return;
   var reader=new FileReader();
   reader.onload=function(e){
-    var lines=e.target.result.split("\n"),AL=["U13","U15","U17","U19","U23"],added=0,dup=0;
+    var raw=e.target.result;
+    // Détecte le séparateur (;  ou ,)
+    var sep=raw.indexOf(";")>-1?";":","  ;
+    var lines=raw.split(/\r?\n/);
+    var AL=["U13","U15","U17","U19","U23"],added=0,dup=0,ignored=0;
     var ex=new Set(rowers.map(function(r){return r.name.toLowerCase();}));
     var batch=db.batch();
-    lines.forEach(function(line){
-      var cols=line.split(";");if(cols.length<22)return;
-      var nom=(cols[1]||"").trim(),prenom=(cols[2]||"").trim(),lic=(cols[13]||"").trim(),cat=(cols[21]||"").trim().toUpperCase();
-      if(!nom||!prenom||AL.indexOf(cat)<0)return;
-      var fn=prenom+" "+nom;
+    // Analyse la 1ère ligne non-vide pour détecter le format
+    var header=null;
+    for(var hi=0;hi<lines.length;hi++){if(lines[hi].trim()){{header=lines[hi].split(sep);break;}}}
+    // Cherche les colonnes utiles par nom ou position
+    function findCol(hdrs,names){
+      for(var i=0;i<hdrs.length;i++){
+        var h=hdrs[i].trim().toLowerCase().replace(/['"]/g,"");
+        for(var j=0;j<names.length;j++){if(h.indexOf(names[j])>-1)return i;}
+      }
+      return -1;
+    }
+    var hasHeader=header&&isNaN(parseInt(header[0]));
+    var nomCol=-1,prenomCol=-1,licCol=-1,catCol=-1,birthCol=-1;
+    if(hasHeader){
+      nomCol=findCol(header,["nom","name","last"]);
+      prenomCol=findCol(header,["prenom","prénom","first"]);
+      licCol=findCol(header,["licence","lic","license"]);
+      catCol=findCol(header,["cat","categorie","catégorie"]);
+      birthCol=findCol(header,["naissance","birth","born","ddn","année"]);
+    }
+    // Fallback : format FRBA classique (nom=col1, prenom=col2, lic=col13, cat=col21)
+    var frbaFormat=(nomCol<0&&prenomCol<0);
+    var startLine=hasHeader?1:0;
+    lines.slice(startLine).forEach(function(line){
+      if(!line.trim())return;
+      var cols=line.split(sep);
+      var nom,prenom,lic,cat,rawDate;
+      if(!frbaFormat){
+        nom=nomCol>=0?(cols[nomCol]||"").trim().replace(/['"]/g,""):"";
+        prenom=prenomCol>=0?(cols[prenomCol]||"").trim().replace(/['"]/g,""):"";
+        lic=licCol>=0?(cols[licCol]||"").trim().replace(/['"]/g,""):"";
+        cat=catCol>=0?(cols[catCol]||"").trim().toUpperCase().replace(/['"]/g,""):"";
+        rawDate=birthCol>=0?(cols[birthCol]||"").trim():"";
+      } else {
+        // Format FRBA : longueur min 22 cols
+        if(cols.length<3)return;
+        nom=(cols[1]||"").trim();
+        prenom=(cols[2]||"").trim();
+        lic=cols.length>=14?(cols[13]||"").trim():"";
+        cat=cols.length>=22?(cols[21]||"").trim().toUpperCase():"";
+        rawDate=(cols[3]||"").trim();
+      }
+      if(!nom&&!prenom){ignored++;return;}
+      // Construit le nom complet
+      var fn=prenom?prenom+" "+nom:nom;
+      fn=fn.trim();
+      if(!fn){ignored++;return;}
       if(ex.has(fn.toLowerCase())){dup++;return;}
-      batch.set(db.collection("rowers").doc("r"+Date.now()+Math.random().toString(36).slice(2,5)),{name:fn,licence:lic||"",cat:cat});
+      // Extrait l'année de naissance
+      var byMatch=rawDate.match(/(\d{4})/);
+      var by=byMatch?parseInt(byMatch[1]):0;
+      // Valide cat ou calcule depuis l'année
+      var finalCat=(by>=2000&&by<=2020)?catFromBirth(by):(AL.indexOf(cat)>=0?cat:"");
+      if(!finalCat){ignored++;return;}
+      batch.set(db.collection("rowers").doc("r"+Date.now()+Math.random().toString(36).slice(2,5)),{
+        name:fn,licence:lic||"",cat:finalCat,
+        birthYear:(by>=2000&&by<=2020)?by:null
+      });
       ex.add(fn.toLowerCase());added++;
     });
-    batch.commit().then(function(){document.getElementById("importMsg").textContent=added+" importe(s), "+dup+" doublon(s).";input.value="";});
+    if(added>0){
+      batch.commit()
+        .then(function(){
+          document.getElementById("importMsg").textContent="✓ "+added+" importé(s)"+(dup?" · "+dup+" doublon(s)":"")+(ignored?" · "+ignored+" ignoré(s)":"");
+          input.value="";
+        })
+        .catch(function(err){document.getElementById("importMsg").textContent="Erreur Firebase: "+err.message;});
+    } else {
+      document.getElementById("importMsg").textContent="Aucun rameur importé."+(dup?" "+dup+" doublon(s).":"")+" Vérifiez le format de votre CSV.";
+    }
   };
-  reader.readAsText(input.files[0],"windows-1252");
+  // Essaie windows-1252 d'abord (format FRBA), puis UTF-8
+  try{reader.readAsText(input.files[0],"windows-1252");}
+  catch(e){reader.readAsText(input.files[0],"utf-8");}
 }
  
 function getRB(rid){for(var i=0;i<boats.length;i++){if(boats[i].crew.indexOf(rid)>=0)return boats[i].name;}return null;}
@@ -577,7 +670,7 @@ function renderStats(){
     rl.innerHTML="<div class='empty'>Aucune donnee.</div>";
   }
 
-  var bad=psAll.filter(function(r){return r.rate!==null&&r.rate<30;});
+  var bad=psAll.filter(function(r){return r.rate!==null&&r.rate<60;});
   al.innerHTML="";
   if(bad.length){
     bad.forEach(function(r){
@@ -595,6 +688,19 @@ function renderStats(){
   }
 }
 
+function saveRower(rid){
+  var name=document.getElementById("eNom_"+rid).value.trim();
+  var lic=document.getElementById("eLic_"+rid).value.trim();
+  var birth=parseInt(document.getElementById("eBirth_"+rid).value)||0;
+  var autoCat=birth?catFromBirth(birth):"";
+  if(!name)return flash("Nom requis.");
+  if(!autoCat)return flash("Année de naissance invalide.");
+  ld(true);
+  db.collection("rowers").doc(rid).update({name:name,licence:lic,cat:autoCat,birthYear:birth||null})
+    .then(function(){ld(false);flash("Sauvegardé ✓","ok");document.getElementById("mbg").classList.remove("open");})
+    .catch(function(e){flash("Erreur: "+e.message);ld(false);});
+}
+
 function openRD(rid){
   var r=rowers.find(function(x){return x.id===rid;});if(!r)return;
   var rows=sessions.map(function(s){
@@ -605,18 +711,53 @@ function openRD(rid){
   var p=rows.filter(function(x){return x.present;}).length;
   var a=rows.filter(function(x){return x.absent;}).length;
   var rate=rows.length?Math.round(p/rows.length*100):0;
-  var rh=rows.length?rows.map(function(row){
+  function rowHtml(row){
     var sc=row.present?"ssp":"ssa",sl=row.present?"Present":"Absent";
     var bh=row.boat?"<div class='sboat'>Bateau: "+xe(row.boat)+"</div>":"";
     return "<div class='srow'><div><div style='font-weight:500;font-size:13px'>"+xe(row.type||"Seance")+(row.label?" - "+xe(row.label):"")+"</div>"
       +"<div class='sdate'>"+fd(row.date)+"</div>"+bh+"</div><span class='ss "+sc+"'>"+sl+"</span></div>";
-  }).join(""):"<div style='color:#6a8fad;font-size:13px;padding:6px 0'>Aucune seance.</div>";
+  }
+  // Séparer régates et entraînements
+  var regates=rows.filter(function(r){return r.type==="Regate";});
+  var entrain=rows.filter(function(r){return r.type!=="Regate";});
+  var pReg=regates.filter(function(x){return x.present;}).length;
+  var pEnt=entrain.filter(function(x){return x.present;}).length;
+
+  var rhReg=regates.length
+    ?"<div class='slbl' style='color:var(--gold)'>⛵ Régates ("+pReg+"/"+regates.length+")</div>"
+      +regates.map(rowHtml).join("")
+    :"";
+  var rhEnt=entrain.length
+    ?"<div class='slbl' style='margin-top:10px'>🚣 Entraînements ("+pEnt+"/"+entrain.length+")</div>"
+      +entrain.map(rowHtml).join("")
+    :"";
+  var rh=(rhReg+rhEnt)||"<div style='color:#6a8fad;font-size:13px;padding:6px 0'>Aucune séance.</div>";
+  var dispCat=r.birthYear?catFromBirth(r.birthYear):(r.cat||"?");
   document.getElementById("mtitle").textContent=r.name;
-  document.getElementById("mbody").innerHTML="<div style='display:flex;gap:10px;margin-bottom:12px'>"
-    +"<div class='kpi' style='flex:1;padding:9px'><div class='kval' style='font-size:28px'>"+p+"</div><div class='klbl'>Presences</div></div>"
-    +"<div class='kpi' style='flex:1;padding:9px'><div class='kval' style='font-size:28px;color:#e05c3a'>"+a+"</div><div class='klbl'>Absences</div></div>"
-    +"<div class='kpi' style='flex:1;padding:9px'><div class='kval' style='font-size:28px'>"+rate+"%</div><div class='klbl'>Taux</div></div>"
-    +"</div><div class='slbl'>Detail seances</div>"+rh;
+  document.getElementById("mbody").innerHTML=
+    "<div class='slbl'>Modifier les informations</div>"
+    +"<div style='display:flex;flex-direction:column;gap:7px;margin-bottom:14px;background:var(--hull);border-radius:8px;padding:10px'>"
+    +"<div style='display:flex;gap:7px;align-items:center'>"
+    +"<label style='font-size:11px;color:var(--muted);width:80px;flex-shrink:0'>Nom</label>"
+    +"<input id='eNom_"+rid+"' value='"+xe(r.name)+"' style='flex:1;font-size:13px;padding:6px 9px'>"
+    +"</div>"
+    +"<div style='display:flex;gap:7px;align-items:center'>"
+    +"<label style='font-size:11px;color:var(--muted);width:80px;flex-shrink:0'>Licence</label>"
+    +"<input id='eLic_"+rid+"' value='"+(r.licence||"")+"' placeholder='Numéro de licence' style='flex:1;font-size:13px;padding:6px 9px'>"
+    +"</div>"
+    +"<div style='display:flex;gap:7px;align-items:center'>"
+    +"<label style='font-size:11px;color:var(--muted);width:80px;flex-shrink:0'>Naissance</label>"
+    +"<input id='eBirth_"+rid+"' data-rid='"+rid+"' type='number' value='"+(r.birthYear||"")+"' placeholder='ex: 2009' min='2000' max='2020' style='flex:1;font-size:13px;padding:6px 9px' oninput='updateEditCat(this)'>"
+    +"<span id='eCatShow_"+rid+"' style='font-size:12px;color:var(--spray);font-weight:700;white-space:nowrap'>→ "+dispCat+"</span>"
+    +"</div>"
+    +"<button class='btn bgold' style='margin-top:4px' data-rid='"+rid+"' onclick='saveRower(this.getAttribute(\"data-rid\"))'>💾 Sauvegarder</button>"
+    +"</div>"
+    +"<div style='display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap'>"
+    +"<div class='kpi' style='flex:1;min-width:70px;padding:9px'><div class='kval' style='font-size:24px'>"+p+"</div><div class='klbl'>Présences</div></div>"
+    +"<div class='kpi' style='flex:1;min-width:70px;padding:9px'><div class='kval' style='font-size:24px;color:#e05c3a'>"+a+"</div><div class='klbl'>Absences</div></div>"
+    +"<div class='kpi' style='flex:1;min-width:70px;padding:9px'><div class='kval' style='font-size:24px'>"+rate+"%</div><div class='klbl'>Taux global</div></div>"
+    +"<div class='kpi' style='flex:1;min-width:70px;padding:9px'><div class='kval' style='font-size:24px;color:var(--gold)'>"+pReg+"/"+regates.length+"</div><div class='klbl'>Régates</div></div>"
+    +"</div>"+rh;
   document.getElementById("mbg").classList.add("open");
 }
  
