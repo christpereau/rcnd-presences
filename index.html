@@ -243,10 +243,21 @@ select option{background:var(--hull)}
   </div>
 </div>
  
+<!-- Firebase config injectée au déploiement — ne jamais mettre les clés ici -->
+<script>
+  window.__ENV__ = {
+    FIREBASE_API_KEY:             "%%FIREBASE_API_KEY%%",
+    FIREBASE_AUTH_DOMAIN:         "%%FIREBASE_AUTH_DOMAIN%%",
+    FIREBASE_PROJECT_ID:          "%%FIREBASE_PROJECT_ID%%",
+    FIREBASE_STORAGE_BUCKET:      "%%FIREBASE_STORAGE_BUCKET%%",
+    FIREBASE_MESSAGING_SENDER_ID: "%%FIREBASE_MESSAGING_SENDER_ID%%",
+    FIREBASE_APP_ID:              "%%FIREBASE_APP_ID%%"
+  };
+</script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
-firebase.initializeApp({apiKey:"AIzaSyBqrhteGQUfOz8YjIhcNwrzgIkChq7HlvE",authDomain:"jeune-entrainement.firebaseapp.com",projectId:"jeune-entrainement",storageBucket:"jeune-entrainement.firebasestorage.app",messagingSenderId:"588281323716",appId:"1:588281323716:web:df6edb41921ea321082991"});
+firebase.initializeApp({apiKey:window.__ENV__.FIREBASE_API_KEY,authDomain:window.__ENV__.FIREBASE_AUTH_DOMAIN,projectId:window.__ENV__.FIREBASE_PROJECT_ID,storageBucket:window.__ENV__.FIREBASE_STORAGE_BUCKET,messagingSenderId:window.__ENV__.FIREBASE_MESSAGING_SENDER_ID,appId:window.__ENV__.FIREBASE_APP_ID});
 var db=firebase.firestore();
  
 var SEED=[
@@ -398,7 +409,8 @@ function importCSV(input){
   reader.onload=function(e){
     var raw=e.target.result;
     // Détecte le séparateur (;  ou ,)
-    var sep=raw.indexOf(";")>-1?";":","  ;
+    var sep=raw.indexOf(";")>-1?";":",";
+    // (auto-detect separator)
     var lines=raw.split(/\r?\n/);
     var AL=["U13","U15","U17","U19","U23"],added=0,dup=0,ignored=0;
     var ex=new Set(rowers.map(function(r){return r.name.toLowerCase();}));
