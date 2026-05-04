@@ -324,7 +324,10 @@ function buildTabs(){
 }
 function setCatP(c){catP=c;buildTabs();renderAtt();}
 function setCatR(c){catR=c;buildTabs();renderRowers();}
-function filt(cat){return cat==="Tous"?rowers:rowers.filter(function(r){return r.cat===cat;});}
+function filt(cat){
+  var jeunes=rowers.filter(function(r){return CATS.indexOf(r.cat)>=0;});
+  return cat==="Tous"?jeunes:jeunes.filter(function(r){return r.cat===cat;});
+}
 function defAbsent(){rowers.forEach(function(r){if(att[r.id]===undefined)att[r.id]=false;});}
  
 document.getElementById("sDate").value=today();
@@ -601,7 +604,7 @@ function saveSess(){
   if(!rowers.length)return flash("Aucun rameur.");
   var label=document.getElementById("sLabel").value.trim();
   var type=document.getElementById("sType").value;
-  var snap=rowers.map(function(r){
+  var snap=rowers.filter(function(r){return CATS.indexOf(r.cat)>=0;}).map(function(r){
     var bn=getRB(r.id);
     return {id:r.id,name:r.name,cat:r.cat||"",licence:r.licence||"",present:(att[r.id]===true),absent:(att[r.id]!==true),boat:bn||""};
   });
@@ -610,8 +613,9 @@ function saveSess(){
     return {name:b.name,maxSeats:maxS(b.name),crew:b.crew.map(function(rid){var r=rowers.find(function(x){return x.id===rid;});return r?r.name:"";}).filter(Boolean)};
   }).filter(function(b){return b.crew.length>0;});
   ld(true);
-  db.collection("sessions").doc("s"+Date.now()).set({date:date,label:label,type:type,players:snap,total:rowers.length,presCount:presCount,boats:boatsSnap})
-    .then(function(){rowers.forEach(function(r){att[r.id]=false;});boats=[];renderAtt();renderBoats();ld(false);flash("Seance enregistree: "+presCount+"/"+rowers.length,"ok");})
+  var jeunesCount=snap.length;
+  db.collection("sessions").doc("s"+Date.now()).set({date:date,label:label,type:type,players:snap,total:jeunesCount,presCount:presCount,boats:boatsSnap})
+    .then(function(){rowers.forEach(function(r){att[r.id]=false;});boats=[];renderAtt();renderBoats();ld(false);flash("Seance enregistree: "+presCount+"/"+jeunesCount,"ok");})
     .catch(function(e){flash("Erreur: "+e.message);ld(false);});
 }
  
@@ -626,7 +630,8 @@ function renderStats(){
   function uniqueDays(sl){var d={};sl.forEach(function(s){d[s.date]=true;});return Object.keys(d).length;}
 
   function computePerRower(sl){
-    return rowers.map(function(r){
+    var jeunesRowers=rowers.filter(function(r){return CATS.indexOf(r.cat)>=0;});
+    return jeunesRowers.map(function(r){
       var byDate={};
       sl.forEach(function(s){
         if(!byDate[s.date])byDate[s.date]={present:false,seen:false};
@@ -646,7 +651,7 @@ function renderStats(){
   var daysAll=uniqueDays(sessions),daysReg=uniqueDays(sesReg),daysTrn=uniqueDays(sesTrn);
 
   kg.innerHTML="<div class='kpi'><div class='kval'>"+daysAll+"</div><div class='klbl'>Jours total</div></div>"
-    +"<div class='kpi'><div class='kval'>"+rowers.length+"</div><div class='klbl'>Rameurs</div></div>"
+    +"<div class='kpi'><div class='kval'>"+rowers.filter(function(r){return CATS.indexOf(r.cat)>=0;}).length+"</div><div class='klbl'>Rameurs</div></div>"
     +"<div class='kpi'><div class='kval' style='color:var(--spray)'>"+daysReg+"</div><div class='klbl'>Jours regates</div></div>"
     +"<div class='kpi'><div class='kval' style='color:var(--green)'>"+daysTrn+"</div><div class='klbl'>Jours entr.</div></div>";
 
