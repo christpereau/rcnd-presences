@@ -689,9 +689,8 @@ function renderStats(){
   var psTrn=computePerRower(sesTrn);
   var daysAll=uniqueDays(sessions),daysReg=uniqueDays(sesReg),daysTrn=uniqueDays(sesTrn);
 
-  kg.innerHTML="<div class='kpi'><div class='kval'>"+daysAll+"</div><div class='klbl'>Jours total</div></div>"
-    +"<div class='kpi'><div class='kval'>"+rowers.filter(function(r){return CATS.indexOf(r.cat)>=0;}).length+"</div><div class='klbl'>Rameurs</div></div>"
-    +"<div class='kpi'><div class='kval' style='color:var(--spray)'>"+daysReg+"</div><div class='klbl'>Jours regates</div></div>"
+  kg.innerHTML="<div class='kpi'><div class='kval'>"+rowers.filter(function(r){return CATS.indexOf(r.cat)>=0;}).length+"</div><div class='klbl'>Rameurs</div></div>"
+    +"<div class='kpi'><div class='kval' style='color:var(--spray)'>"+daysReg+"</div><div class='klbl'>Jours régates</div></div>"
     +"<div class='kpi'><div class='kval' style='color:var(--green)'>"+daysTrn+"</div><div class='klbl'>Jours entr.</div></div>";
 
   function rankRow(r,i){
@@ -718,10 +717,9 @@ function renderStats(){
   }
 
   rl.innerHTML="";
-  if(psAll.length){
-    appendBlock(rl,psAll,"Classement global (jours dedupl.)","var(--gold)");
-    if(sesReg.length)appendBlock(rl,psReg,"Regates uniquement","var(--spray)");
-    if(sesTrn.length)appendBlock(rl,psTrn,"Entrainements uniquement","var(--green)");
+  if(psReg.length||psTrn.length){
+    if(sesTrn.length)appendBlock(rl,psTrn,"Entraînements","var(--green)");
+    if(sesReg.length)appendBlock(rl,psReg,"Régates","var(--spray)");
   } else {
     rl.innerHTML="<div class='empty'>Aucune donnee.</div>";
   }
