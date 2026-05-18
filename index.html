@@ -152,6 +152,10 @@ select option{background:var(--hull)}
 <div class="lbar" id="lb"></div>
  
 <div class="page active" id="page-pres">
+<div id="editWarn" style="display:none;align-items:center;gap:10px;background:rgba(212,168,67,.12);border:1px solid rgba(212,168,67,.4);border-radius:8px;padding:10px 14px;margin-bottom:10px;flex-wrap:wrap">
+  <span style="font-size:13px;color:var(--gold);flex:1">✏️ <strong>Mode édition</strong> — vous modifiez une séance existante. Enregistrez pour écraser.</span>
+  <button class="btn boutline bsm" style="border-color:var(--coral);color:var(--coral)" onclick="cancelEdit()">Annuler</button>
+</div>
 <div class="ptitle">Presences</div>
 <div class="card"><div class="clabel">Seance</div><div class="row">
   <input type="date" id="sDate" style="max-width:165px;flex:0 0 auto">
@@ -557,32 +561,59 @@ function renderBoats(){
   }).join("");
 }
  
-var _msBi=-1,_msSel=[];
-function openMs(bi){_msBi=bi;_msSel=[];renderMs();document.getElementById("msPanel").classList.add("open");}
-function closeMs(){document.getElementById("msPanel").classList.remove("open");_msBi=-1;_msSel=[];}
+var _msBi=-1,_msSel=[],_msMixte=undefined;
+var CLUBS=["RCNSM","KRCG","KRSG","KRB","CRB","UNB","UNL","RCNT","ULiège","ARV","TRT","GRS"];
+function openMs(bi){_msBi=bi;_msSel=[];_msMixte=undefined;renderMs();document.getElementById("msPanel").classList.add("open");}
+function closeMs(){document.getElementById("msPanel").classList.remove("open");_msBi=-1;_msSel=[];_msMixte=undefined;}
+function selectMixteClub(cl){_msMixte=Object.assign(_msMixte||{},{club:cl});renderMs();}
+function addMixteRower(){
+  if(!_msMixte||!_msMixte.name||!_msMixte.name.trim()){flash("Entrez un nom pour l'équipier.");return;}
+  if(!_msMixte.club){flash("Choisissez le club de l'équipier.");return;}
+  var b=boats[_msBi],ms=maxS(b.name);
+  if(b.crew.length>=ms){flash("Bateau complet.");return;}
+  var fakeId="mixte_"+Date.now();
+  var label=_msMixte.name.trim()+" ("+_msMixte.club+")";
+  // On injecte directement dans le crew comme nom formaté via un id virtuel
+  rowers.push({id:fakeId,name:label,cat:"Mixte",_mixte:true});
+  att[fakeId]=true;
+  b.crew.push(fakeId);
+  _msMixte=undefined;
+  closeMs();renderBoats();renderAtt();
+}
 function renderMs(){
   if(_msBi<0)return;
   var b=boats[_msBi],ms=maxS(b.name);
+  var isRegate=(document.getElementById("sType").value==="Regate");
   var used=new Set();
-  boats.forEach(function(bb){bb.crew.forEach(function(rid){if(rid)used.add(rid);});});
-  var avail=rowers.filter(function(r){return att[r.id]===true&&!used.has(r.id);});
+  if(!isRegate){boats.forEach(function(bb){bb.crew.forEach(function(rid){if(rid)used.add(rid);});});}
+  var avail=rowers.filter(function(r){return att[r.id]===true&&(isRegate||!used.has(r.id));});
   var seats=ms-b.crew.length,sel=_msSel.length,isFull=(sel>=seats);
   document.getElementById("msTtl").textContent="Bateau "+xe(b.name);
   document.getElementById("msSub").textContent=sel+" selectionne"+(sel>1?"s":"")+" / "+seats+" place"+(seats>1?"s":"")+" dispo";
-  if(!avail.length){
-    document.getElementById("msList").innerHTML="<div style='color:#6a8fad;font-size:13px;padding:10px 0'>Aucun rameur present disponible.</div>";
-    return;
-  }
-  document.getElementById("msList").innerHTML=avail.map(function(r){
+  // Section équipier mixte
+  var mixteHtml="<div style='margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)'>"
+    +"<div style='font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold);font-weight:700;margin-bottom:6px'>⚓ Équipier mixte (autre club)</div>"
+    +(_msMixte!==undefined
+      ? "<div style='display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px'>"
+        +CLUBS.map(function(cl){var sel=(_msMixte&&_msMixte.club===cl);return "<button style='padding:3px 9px;border-radius:12px;border:1px solid "+(sel?"var(--gold)":"var(--border)")+";background:"+(sel?"rgba(212,168,67,.15)":"transparent")+";color:"+(sel?"var(--gold)":"var(--muted)")+";font-size:12px;cursor:pointer' onclick='selectMixteClub(\""+cl+"\")'>"+cl+"</button>";}).join("")
+        +"</div>"
+        +"<input id='mixteNomInput' placeholder='Nom de l équipier...' value='"+xe((_msMixte&&_msMixte.name)||"")+"' style='margin-bottom:6px;font-size:13px;padding:6px 9px;width:100%' oninput='_msMixte=Object.assign(_msMixte||{},{name:this.value})'>"
+        +"<button style='padding:5px 12px;border-radius:7px;border:1px solid var(--oar);background:rgba(46,108,164,.15);color:var(--spray);font-size:12px;cursor:pointer' onclick='addMixteRower()'>✓ Ajouter</button>"
+        +" <button style='padding:5px 12px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;cursor:pointer' onclick='_msMixte=undefined;renderMs()'>Annuler</button>"
+      : "<button style='padding:5px 12px;border-radius:7px;border:1px solid var(--oar);background:rgba(46,108,164,.1);color:var(--spray);font-size:12px;cursor:pointer' onclick='_msMixte={};renderMs()'>+ Équipier d'un autre club</button>"
+    )
+    +"</div>";
+  var listHtml=avail.length?avail.map(function(r){
     var isSel=(_msSel.indexOf(r.id)>=0);
-    var c=cc(r.cat);
+    var c=r._mixte?"":"cu"+r.cat.toLowerCase().replace("u","");
     var dis=(!isSel&&isFull)?" dis":"";
     return "<div class='msrow"+(isSel?" sel":"")+dis+"' onclick='clickMs(\""+r.id+"\")'>"
       +"<div class='msav'>"+xe(r.name[0].toUpperCase())+"</div>"
-      +"<div style='flex:1;min-width:0'><span style='font-size:14px;font-weight:500'>"+xe(r.name)+"</span><span class='bcat "+c+"' style='margin-left:5px'>"+xe(r.cat)+"</span></div>"
+      +"<div style='flex:1;min-width:0'><span style='font-size:14px;font-weight:500'>"+xe(r.name)+"</span>"+(r._mixte?"<span style='font-size:10px;color:var(--gold);margin-left:5px;background:rgba(212,168,67,.1);padding:2px 6px;border-radius:4px'>mixte</span>":"<span class='bcat "+c+"' style='margin-left:5px'>"+xe(r.cat)+"</span>")+"</div>"
       +"<div class='msck'>"+(isSel?"&#10003;":"")+"</div>"
       +"</div>";
-  }).join("");
+  }).join(""):"<div style='color:#6a8fad;font-size:13px;padding:4px 0'>Aucun rameur du club disponible.</div>";
+  document.getElementById("msList").innerHTML=mixteHtml+listHtml;
 }
 function clickMs(rid){
   var b=boats[_msBi],ms=maxS(b.name),seats=ms-b.crew.length;
@@ -614,8 +645,16 @@ function saveSess(){
   }).filter(function(b){return b.crew.length>0;});
   ld(true);
   var jeunesCount=snap.length;
-  db.collection("sessions").doc("s"+Date.now()).set({date:date,label:label,type:type,players:snap,total:jeunesCount,presCount:presCount,boats:boatsSnap})
-    .then(function(){rowers.forEach(function(r){att[r.id]=false;});boats=[];renderAtt();renderBoats();ld(false);flash("Seance enregistree: "+presCount+"/"+jeunesCount,"ok");})
+  var docId=_editSessId||("s"+Date.now());
+  db.collection("sessions").doc(docId).set({date:date,label:label,type:type,players:snap,total:jeunesCount,presCount:presCount,boats:boatsSnap})
+    .then(function(){
+      rowers.forEach(function(r){att[r.id]=false;});boats=[];
+      var wasEdit=!!_editSessId;
+      _editSessId=null;
+      var warn=document.getElementById("editWarn");if(warn)warn.style.display="none";
+      renderAtt();renderBoats();ld(false);
+      flash(wasEdit?"Séance mise à jour ✓":"Seance enregistree: "+presCount+"/"+jeunesCount,"ok");
+    })
     .catch(function(e){flash("Erreur: "+e.message);ld(false);});
 }
  
@@ -770,10 +809,8 @@ function openRD(rid){
     +"<button class='btn bgold' style='margin-top:4px' data-rid='"+rid+"' onclick='saveRower(this.getAttribute(\"data-rid\"))'>💾 Sauvegarder</button>"
     +"</div>"
     +"<div style='display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap'>"
-    +"<div class='kpi' style='flex:1;min-width:70px;padding:9px'><div class='kval' style='font-size:24px'>"+p+"</div><div class='klbl'>Présences</div></div>"
-    +"<div class='kpi' style='flex:1;min-width:70px;padding:9px'><div class='kval' style='font-size:24px;color:#e05c3a'>"+a+"</div><div class='klbl'>Absences</div></div>"
-    +"<div class='kpi' style='flex:1;min-width:70px;padding:9px'><div class='kval' style='font-size:24px'>"+rate+"%</div><div class='klbl'>Taux global</div></div>"
     +"<div class='kpi' style='flex:1;min-width:70px;padding:9px'><div class='kval' style='font-size:24px;color:var(--gold)'>"+pReg+"/"+regates.length+"</div><div class='klbl'>Régates</div></div>"
+    +"<div class='kpi' style='flex:1;min-width:70px;padding:9px'><div class='kval' style='font-size:24px;color:var(--green)'>"+pEnt+"/"+entrain.length+"</div><div class='klbl'>Entraînements</div></div>"
     +"</div>"+rh;
   document.getElementById("mbg").classList.add("open");
 }
@@ -790,6 +827,7 @@ function renderHist(){
       +"<div style='min-width:0'><div class='hdate'>"+fd(s.date)+"<span class='chip'>"+xe(s.type||"Seance")+"</span>"+(s.label?"<span class='chip'>"+xe(s.label)+"</span>":"")+bb+"</div>"
       +"<div class='hsub'>"+s.presCount+" presents, "+(s.total-s.presCount)+" absents, "+s.total+" rameurs</div></div>"
       +"<div class='hpct'>"+pct+"%</div></div>"
+      +"<button class='btn boar' style='padding:5px 9px;font-size:14px;flex-shrink:0' onclick='editSess(\""+s.id+"\")' title='Modifier'>✏️</button>"
       +"<button class='btn bdanger' style='padding:5px 9px;font-size:16px;flex-shrink:0' onclick='delSess(\""+s.id+"\",\""+fd(s.date)+"\")'>&#128465;</button>"
       +"</div>";
   }).join("");
@@ -813,6 +851,51 @@ function openSM(id){
   document.getElementById("mbg").classList.add("open");
 }
  
+var _editSessId=null;
+
+function editSess(id){
+  var s=sessions.find(function(x){return x.id===id;});if(!s)return;
+  // Charge les données dans la page Présences
+  document.getElementById("sDate").value=s.date;
+  document.getElementById("sLabel").value=s.label||"";
+  document.getElementById("sType").value=s.type||"Sortie eau";
+  // Réinitialise les présences selon la séance
+  rowers.forEach(function(r){att[r.id]=false;});
+  (s.players||[]).forEach(function(p){att[p.id]=(p.present===true);});
+  // Bateaux
+  boats=[];
+  (s.boats||[]).forEach(function(b){
+    var crew=[];
+    (b.crew||[]).forEach(function(name){
+      var r=rowers.find(function(x){return x.name===name;});
+      if(r)crew.push(r.id);
+    });
+    if(crew.length||b.name)boats.push({name:b.name,crew:crew});
+  });
+  _editSessId=id;
+  // Navigue vers la page Présences
+  var btn=document.querySelector("nav button");
+  showPage("pres",btn);
+  renderAtt();renderBoats();
+  // Bandeau d'avertissement
+  var warn=document.getElementById("editWarn");
+  if(warn){warn.style.display="flex";}
+  flash("Séance chargée — modifiez et ré-enregistrez.",  "ok");
+}
+
+function cancelEdit(){
+  _editSessId=null;
+  rowers.forEach(function(r){att[r.id]=false;});
+  boats=[];
+  document.getElementById("sDate").value=today();
+  document.getElementById("sLabel").value="";
+  document.getElementById("sType").value="Sortie eau";
+  var warn=document.getElementById("editWarn");
+  if(warn)warn.style.display="none";
+  renderAtt();renderBoats();
+  flash("Modification annulée.","ok");
+}
+
 function delSess(id,dateStr){
   if(!confirm("Supprimer la seance du "+dateStr+" ?"))return;
   ld(true);
